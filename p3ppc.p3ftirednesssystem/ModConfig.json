@@ -1,0 +1,72 @@
+{
+  "ModId": "p3ppc.p3ftirednesssystem",
+  "ModName": "P3F Tiredness System",
+  "ModAuthor": "NORADEX",
+  "ModVersion": "1.0.0",
+  "ModDescription": "Brings back FES fatigue, sick states, rest rules, and trips out of Tartarus.",
+  "ModDll": "p3ppc.p3ftirednesssystem.dll",
+  "ModIcon": "",
+  "ModR2RManagedDll32": "x86/p3ppc.p3ftirednesssystem.dll",
+  "ModR2RManagedDll64": "x64/p3ppc.p3ftirednesssystem.dll",
+  "ModNativeDll32": "",
+  "ModNativeDll64": "",
+  "Tags": [],
+  "CanUnload": false,
+  "HasExports": false,
+  "IsLibrary": false,
+  "ReleaseMetadataFileName": "p3ppc.p3ftirednesssystem.ReleaseMetadata.json",
+  "PluginData": {
+    "GitHubDependencies": {
+      "IdToConfigMap": {
+        "Reloaded.Memory.SigScan.ReloadedII": {
+          "Config": {
+            "UserName": "Reloaded-Project",
+            "RepositoryName": "Reloaded.Memory.SigScan",
+            "UseReleaseTag": false,
+            "AssetFileName": "Mod.zip"
+          },
+          "ReleaseMetadataName": "Reloaded.Memory.SigScan.ReloadedII.ReleaseMetadata.json"
+        },
+        "reloaded.sharedlib.hooks": {
+          "Config": {
+            "UserName": "Sewer56",
+            "RepositoryName": "Reloaded.SharedLib.Hooks.ReloadedII",
+            "UseReleaseTag": true,
+            "AssetFileName": "reloaded.sharedlib.hooks.zip"
+          },
+          "ReleaseMetadataName": "Sewer56.Update.ReleaseMetadata.json"
+        },
+        "reloaded.universal.fileemulationframework.bf": {
+          "Config": {
+            "UserName": "Sewer56",
+            "RepositoryName": "FileEmulationFramework",
+            "UseReleaseTag": false,
+            "AssetFileName": "Mod.zip"
+          },
+          "ReleaseMetadataName": "BF.File.Emulator.ReleaseMetadata.json"
+        },
+        "reloaded.universal.fileemulationframework.pak": {
+          "Config": {
+            "UserName": "Sewer56",
+            "RepositoryName": "FileEmulationFramework",
+            "UseReleaseTag": false,
+            "AssetFileName": "Mod.zip"
+          },
+          "ReleaseMetadataName": "PAK.Stream.Emulator.ReleaseMetadata.json"
+        }
+      }
+    }
+  },
+  "IsUniversalMod": false,
+  "ModDependencies": [
+    "Reloaded.Memory.SigScan.ReloadedII",
+    "reloaded.sharedlib.hooks",
+    "reloaded.universal.fileemulationframework.pak",
+    "reloaded.universal.fileemulationframework.bf"
+  ],
+  "OptionalDependencies": [],
+  "SupportedAppId": [
+    "p3p.exe"
+  ],
+  "ProjectUrl": ""
+}
