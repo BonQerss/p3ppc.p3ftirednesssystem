@@ -1,11 +1,11 @@
 {
   "ModId": "p3ppc.p3ftirednesssystem",
   "ModName": "P3F Tiredness System",
-  "ModAuthor": "NORADEX",
+  "ModAuthor": "Noradex",
   "ModVersion": "1.0.0",
-  "ModDescription": "Brings back FES fatigue, sick states, rest rules, and trips out of Tartarus.",
+  "ModDescription": "Restores Persona 3 FES style battle fatigue, tiredness, sickness progression systems.",
   "ModDll": "p3ppc.p3ftirednesssystem.dll",
-  "ModIcon": "",
+  "ModIcon": "Preview.png",
   "ModR2RManagedDll32": "x86/p3ppc.p3ftirednesssystem.dll",
   "ModR2RManagedDll64": "x64/p3ppc.p3ftirednesssystem.dll",
   "ModNativeDll32": "",
@@ -36,6 +36,15 @@
           },
           "ReleaseMetadataName": "Sewer56.Update.ReleaseMetadata.json"
         },
+        "reloaded.universal.fileemulationframework.pak": {
+          "Config": {
+            "UserName": "Sewer56",
+            "RepositoryName": "FileEmulationFramework",
+            "UseReleaseTag": false,
+            "AssetFileName": "Mod.zip"
+          },
+          "ReleaseMetadataName": "PAK.Stream.Emulator.ReleaseMetadata.json"
+        },
         "reloaded.universal.fileemulationframework.bf": {
           "Config": {
             "UserName": "Sewer56",
@@ -45,16 +54,20 @@
           },
           "ReleaseMetadataName": "BF.File.Emulator.ReleaseMetadata.json"
         },
-        "reloaded.universal.fileemulationframework.pak": {
+        "reloaded.universal.fileemulationframework": {
           "Config": {
             "UserName": "Sewer56",
             "RepositoryName": "FileEmulationFramework",
             "UseReleaseTag": false,
             "AssetFileName": "Mod.zip"
           },
-          "ReleaseMetadataName": "PAK.Stream.Emulator.ReleaseMetadata.json"
+          "ReleaseMetadataName": "Reloaded.Universal.FileEmulationFramework.ReleaseMetadata.json"
         }
       }
+    },
+    "GameBanana": {
+      "ItemType": "Mod",
+      "ItemId": 724943
     }
   },
   "IsUniversalMod": false,
@@ -68,5 +81,7 @@
   "SupportedAppId": [
     "p3p.exe"
   ],
-  "ProjectUrl": ""
+  "ProjectUrl": "",
+  "CreatorUrl": "",
+  "IsSeparator": false
 }

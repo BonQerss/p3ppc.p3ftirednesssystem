@@ -24,35 +24,37 @@ internal static class Utils
         BaseAddress = process.MainModule?.BaseAddress ?? 0;
         if (BaseAddress == 0)
         {
-            LogError("The game base address could not be found.");
+            LogError("Unable to resolve the main module base address.");
             return false;
         }
 
         var controller = modLoader.GetController<IStartupScanner>();
-        if (controller == null || !controller.TryGetTarget(out _scanner))
+        if (controller == null || !controller.TryGetTarget(out var scanner) || scanner == null)
         {
-            LogError("Reloaded SigScan is not ready.");
+            LogError("Unable to get Reloaded SigScan controller.");
             return false;
         }
 
+        _scanner = scanner;
         return true;
     }
 
     internal static void UpdateConfig(Config config) => _config = config;
 
-    internal static void Log(string message) => _logger.WriteLine($"{Prefix} {message}");
+    internal static void Log(string message)
+        => _logger.WriteLine($"{Prefix} {message}");
 
     internal static void LogDebug(string message)
     {
         if (_config.DebugEnabled)
-        {
             _logger.WriteLine($"{Prefix} {message}");
-        }
     }
 
-    internal static void LogError(string message) => _logger.WriteLine($"{Prefix} ERROR: {message}", Color.Red);
+    internal static void LogError(string message)
+        => _logger.WriteLine($"{Prefix} ERROR: {message}", Color.Red);
 
-    internal static void LogError(string message, Exception exception) => _logger.WriteLine($"{Prefix} ERROR: {message}: {exception.Message}", Color.Red);
+    internal static void LogError(string message, Exception exception)
+        => _logger.WriteLine($"{Prefix} ERROR: {message}\n{exception}", Color.Red);
 
     internal static void SigScan(string name, string pattern, Action<nint> action)
     {
@@ -60,12 +62,12 @@ internal static class Utils
         {
             if (!result.Found)
             {
-                LogError($"Could not find {name}.");
+                LogError($"Unable to find {name}; the tiredness restoration will not install.");
                 return;
             }
 
             nint address = result.Offset + BaseAddress;
-            LogDebug($"Resolved {name}.");
+            LogDebug($"Found {name} at P3P.exe+0x{result.Offset:X}.");
 
             try
             {
@@ -81,9 +83,7 @@ internal static class Utils
     internal static unsafe nint ResolveRelativeCall(nint instruction)
     {
         if (*(byte*)instruction != 0xE8)
-        {
-            throw new InvalidOperationException("Expected CALL rel32.");
-        }
+            throw new InvalidOperationException($"Expected CALL rel32 at P3P.exe+0x{instruction - BaseAddress:X}.");
 
         return instruction + 5 + *(int*)(instruction + 1);
     }
@@ -91,9 +91,7 @@ internal static class Utils
     internal static unsafe nint ResolveRelativeJump(nint instruction)
     {
         if (*(byte*)instruction != 0xE9)
-        {
-            throw new InvalidOperationException("Expected JMP rel32.");
-        }
+            throw new InvalidOperationException($"Expected JMP rel32 at P3P.exe+0x{instruction - BaseAddress:X}.");
 
         return instruction + 5 + *(int*)(instruction + 1);
     }

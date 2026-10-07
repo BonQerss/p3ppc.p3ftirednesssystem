@@ -17,7 +17,3 @@ public class Config : Configurable<Config>
     [DefaultValue(1)]
     public int FatigueDrainMultiplier { get; set; } = 1;
 }
-
-public class ConfiguratorMixin : ConfiguratorMixinBase
-{
-}

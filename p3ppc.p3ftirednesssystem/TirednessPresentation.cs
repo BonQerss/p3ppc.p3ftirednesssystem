@@ -8,9 +8,11 @@ internal unsafe sealed class TirednessPresentation
     private const ushort Tired = 3;
     private const ushort Sick = 5;
 
+    
     private const ushort FesTiredActorState = 0x21;
-    private const uint PortableResultCameraTaskType = 0x60A;
 
+    
+    
     private const byte WaitForCompletion = 4;
     private const byte WaitForActivePhase = 5;
     private const byte NoDependency = 1;
@@ -25,7 +27,14 @@ internal unsafe sealed class TirednessPresentation
 
     internal readonly record struct PresentationHandle(ulong CompletionTaskId);
 
-    internal TirednessPresentation(CreateBattleStateTask createBattleStateTask, CreateCrossfadeTask createCrossfadeTask, CreateMotionTask createMotionTask, CreateSoundTask createSoundTask, CreateActorVoiceTask createActorVoiceTask, CreateNavigatorTask createNavigatorTask, EnqueueBattleTask enqueueBattleTask)
+    internal TirednessPresentation(
+        CreateBattleStateTask createBattleStateTask,
+        CreateCrossfadeTask createCrossfadeTask,
+        CreateMotionTask createMotionTask,
+        CreateSoundTask createSoundTask,
+        CreateActorVoiceTask createActorVoiceTask,
+        CreateNavigatorTask createNavigatorTask,
+        EnqueueBattleTask enqueueBattleTask)
     {
         _createBattleStateTask = createBattleStateTask;
         _createCrossfadeTask = createCrossfadeTask;
@@ -36,14 +45,19 @@ internal unsafe sealed class TirednessPresentation
         _enqueueBattleTask = enqueueBattleTask;
     }
 
-    internal bool TryStart(BattleActor* actor, CombatModel* model, ushort condition, out PresentationHandle handle)
+    
+
+    
+    internal bool TryStart(
+        BattleActor* actor,
+        CombatModel* model,
+        ushort condition,
+        out PresentationHandle handle)
     {
         handle = default;
 
         if (actor == null || model == null)
-        {
             return false;
-        }
 
         ushort navigatorEvent;
         ushort actorVoiceEvent;
@@ -65,11 +79,10 @@ internal unsafe sealed class TirednessPresentation
                 return false;
         }
 
+        
         var baseTask = (BattleTask*)_createBattleStateTask((nint)actor, FesTiredActorState);
         if (baseTask == null)
-        {
             return false;
-        }
 
         baseTask->OwnerToken = actor->OwnerToken;
         baseTask->Delay = 8.0f;
@@ -85,44 +98,38 @@ internal unsafe sealed class TirednessPresentation
 
         var motionTask = (BattleTask*)_createMotionTask((nint)model, 3, 0, 1.0f, 1);
         if (motionTask == null)
-        {
             return false;
-        }
 
         SetPreDependency(motionTask, WaitForActivePhase, baseTaskId);
         _enqueueBattleTask((nint)motionTask, 1);
 
         var soundTask = (BattleTask*)_createSoundTask(0xE, 2, 9);
         if (soundTask == null)
-        {
             return false;
-        }
 
         SetPreDependency(soundTask, WaitForActivePhase, baseTaskId);
         _enqueueBattleTask((nint)soundTask, 1);
 
+        
+        
         SetCompletionDependency(soundTask, 0, WaitForCompletion, baseTaskId);
         if (crossfadeTask != null)
-        {
             SetCompletionDependency(soundTask, 1, WaitForCompletion, crossfadeTask->TaskId);
-        }
 
         var actorVoiceTask = (BattleTask*)_createActorVoiceTask((nint)actor, actorVoiceEvent, 0, 0, 0);
         if (actorVoiceTask == null)
-        {
             return false;
-        }
 
         SetPreDependency(actorVoiceTask, WaitForActivePhase, baseTaskId);
         _enqueueBattleTask((nint)actorVoiceTask, 1);
 
         var navigatorTask = (BattleTask*)_createNavigatorTask((nint)actor, navigatorEvent, 0, 0, 1);
         if (navigatorTask == null)
-        {
             return false;
-        }
 
         SetPreDependency(navigatorTask, WaitForCompletion, actorVoiceTask->TaskId);
+
+        
 
         SetCompletionDependency(navigatorTask, 0, WaitForCompletion, motionTask->TaskId);
         SetCompletionDependency(navigatorTask, 1, WaitForCompletion, soundTask->TaskId);
@@ -132,109 +139,65 @@ internal unsafe sealed class TirednessPresentation
         return true;
     }
 
-    internal static ulong RetargetResultCameraInRange(nint combatInfo, ulong firstTaskIdExclusive, ulong lastTaskIdInclusive, CombatModel* model)
-    {
-        if (combatInfo == 0 || model == null || lastTaskIdInclusive <= firstTaskIdExclusive)
-        {
-            return 0;
-        }
+    
 
-        const int resultCameraQueue = 1;
-        int guard = 0;
-        for (BattleTask* task = *(BattleTask**)(combatInfo + 0x200 + resultCameraQueue * 0x10); task != null && guard++ < 512; task = task->Next)
-        {
-            if (task->TaskId <= firstTaskIdExclusive || task->TaskId > lastTaskIdInclusive)
-            {
-                continue;
-            }
+    
 
-            if (task->TaskType != PortableResultCameraTaskType || task->Args == null)
-            {
-                continue;
-            }
+    
 
-            float x = model->RotationX;
-            float y = model->RotationY;
-            float z = model->RotationZ;
-            float w = model->RotationW;
+    
 
-            if (!IsFiniteQuaternion(x, y, z, w))
-            {
-                return 0;
-            }
-
-            float* cameraQuaternion = (float*)task->Args;
-            cameraQuaternion[0] = z;
-            cameraQuaternion[1] = w;
-            cameraQuaternion[2] = -x;
-            cameraQuaternion[3] = -y;
-
-            task->Delay = 8.0f;
-            return task->TaskId;
-        }
-
-        return 0;
-    }
-
-    private static bool IsFiniteQuaternion(float x, float y, float z, float w)
-    {
-        if (!float.IsFinite(x) || !float.IsFinite(y) || !float.IsFinite(z) || !float.IsFinite(w))
-        {
-            return false;
-        }
-
-        float lengthSquared = x * x + y * y + z * z + w * w;
-        return float.IsFinite(lengthSquared) && lengthSquared > 0.000001f;
-    }
-
+    
+    
     internal static ulong GetMaxQueuedTaskId(nint combatInfo)
     {
         if (combatInfo == 0)
-        {
             return 0;
-        }
 
         ulong max = 0;
         for (int queue = 0; queue < 4; queue++)
         {
             int guard = 0;
-            for (BattleTask* task = *(BattleTask**)(combatInfo + 0x200 + queue * 0x10); task != null && guard++ < 512; task = task->Next)
+            for (BattleTask* task = *(BattleTask**)(combatInfo + 0x200 + queue * 0x10);
+                 task != null && guard++ < 512;
+                 task = task->Next)
             {
                 if (task->TaskId > max)
-                {
                     max = task->TaskId;
-                }
             }
         }
 
         return max;
     }
 
-    internal int GateTasksInRange(nint combatInfo, ulong firstTaskIdExclusive, ulong lastTaskIdInclusive, ulong completionTaskId, ulong excludedTaskId, out int ungatedTasks)
+    
+
+    
+    
+    internal int GateTasksInRange(
+        nint combatInfo,
+        ulong firstTaskIdExclusive,
+        ulong lastTaskIdInclusive,
+        ulong completionTaskId,
+        out int ungatedTasks)
     {
         ungatedTasks = 0;
         if (combatInfo == 0 || completionTaskId == 0 || lastTaskIdInclusive <= firstTaskIdExclusive)
-        {
             return 0;
-        }
 
         int gated = 0;
 
         for (int queue = 0; queue < 4; queue++)
         {
             int guard = 0;
-            for (BattleTask* task = *(BattleTask**)(combatInfo + 0x200 + queue * 0x10); task != null && guard++ < 512; task = task->Next)
+            for (BattleTask* task = *(BattleTask**)(combatInfo + 0x200 + queue * 0x10);
+                 task != null && guard++ < 512;
+                 task = task->Next)
             {
                 if (task->TaskId <= firstTaskIdExclusive || task->TaskId > lastTaskIdInclusive)
-                {
                     continue;
-                }
 
-                if (excludedTaskId != 0 && task->TaskId == excludedTaskId)
-                {
-                    continue;
-                }
-
+                
                 if (task->DependencyType2 == NoDependency)
                 {
                     task->DependencyType2 = WaitForCompletion;
@@ -243,6 +206,7 @@ internal unsafe sealed class TirednessPresentation
                     continue;
                 }
 
+                
                 if (task->DependencyType == NoDependency)
                 {
                     task->DependencyType = WaitForCompletion;

@@ -1,47 +1,7 @@
-// P3P's 2D Tartarus entrance retains member_return(), but its return-mode init
-// never consumes the existing FES/P3P member-return flag (3568).
-// Preserve stock init, consume the handoff, then mirror set_member()'s
-// presence -> party-selection availability synchronization immediately.
 void f015_018_init_hookafter()
 {
     if ((EVT_FUNCTION_0032() == 1) && BIT_CHK(3568))
     {
         member_return();
-        sync_departure_availability();
-
-        // PARTY_OUT updates party state, but the 2D entrance actors were already
-        // spawned for this field instance. Reload the same entrance after the
-        // stock departure dialogue so the new presence/availability state is
-        // reflected by the field actors immediately. member_return() clears
-        // 3568, so the reload will not repeat this departure sequence.
-        CALL_FIELD(15, 18, 1, 0);
-        return;
     }
-}
-
-void sync_departure_availability()
-{
-    if (!BIT_CHK(322))
-        BIT_OFF(3096);
-
-    if (!BIT_CHK(323))
-        BIT_OFF(3097);
-
-    if (!BIT_CHK(324))
-        BIT_OFF(3098);
-
-    if (!BIT_CHK(325))
-        BIT_OFF(3099);
-
-    if (!BIT_CHK(326))
-        BIT_OFF(3100);
-
-    if (!BIT_CHK(327))
-        BIT_OFF(3101);
-
-    if (!BIT_CHK(328))
-        BIT_OFF(3102);
-
-    if (!BIT_CHK(329))
-        BIT_OFF(3103);
 }

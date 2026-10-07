@@ -21,21 +21,11 @@ internal static unsafe class NativeTypes
         internal ushort MemberId;
     }
 
+    
+
     [StructLayout(LayoutKind.Explicit)]
     internal struct CombatModel
     {
-
-        [FieldOffset(0x1C)]
-        internal float RotationX;
-
-        [FieldOffset(0x20)]
-        internal float RotationY;
-
-        [FieldOffset(0x24)]
-        internal float RotationZ;
-
-        [FieldOffset(0x28)]
-        internal float RotationW;
 
         [FieldOffset(0xCE0)]
         internal PartyMemberInfo* MemberInfo;
@@ -44,6 +34,8 @@ internal static unsafe class NativeTypes
         internal CombatModel* Next;
     }
 
+    
+    
     [StructLayout(LayoutKind.Explicit)]
     internal struct BattleActor
     {
@@ -56,6 +48,8 @@ internal static unsafe class NativeTypes
         [FieldOffset(0x570)]
         internal BattleActor* Next;
     }
+
+    
 
     [StructLayout(LayoutKind.Explicit)]
     internal struct BattleTask
@@ -72,6 +66,7 @@ internal static unsafe class NativeTypes
         [FieldOffset(0x18)]
         internal ulong DependencyTaskId2;
 
+        
         [FieldOffset(0x20)]
         internal byte CompletionDependencyType;
 
@@ -84,9 +79,6 @@ internal static unsafe class NativeTypes
         [FieldOffset(0x38)]
         internal ulong CompletionDependencyTaskId2;
 
-        [FieldOffset(0x40)]
-        internal uint TaskType;
-
         [FieldOffset(0x48)]
         internal float Delay;
 
@@ -98,9 +90,6 @@ internal static unsafe class NativeTypes
 
         [FieldOffset(0x70)]
         internal nint Callback;
-
-        [FieldOffset(0x88)]
-        internal void* Args;
 
         [FieldOffset(0x90)]
         internal BattleTask* Next;

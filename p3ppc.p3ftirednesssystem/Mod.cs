@@ -16,6 +16,7 @@ public unsafe class Mod : ModBase
     private const uint FirstAvailabilityFlag = 3096;
     private const uint MemberReturnTriggerFlag = 3568;
 
+    
     private static readonly ushort[] DepartureMembers = { 2, 3, 4, 5, 7, 8, 9, 10 };
 
     private const ushort Tired = 3;
@@ -54,6 +55,7 @@ public unsafe class Mod : ModBase
 
     private nint _fatigueAddress;
     private nint _victoryPresentationAddress;
+    private nint _combatInfoAnchorAddress;
     private nint _allDeadAddress;
     private nint _setUnitConditionAddress;
     private nint _counterIncrementAddress;
@@ -63,7 +65,7 @@ public unsafe class Mod : ModBase
     private nint _combatInfoGlobalAddress;
 
     private int _resolvedPieces;
-    private const int RequiredPieces = 21;
+    private const int RequiredPieces = 12;
     private bool _installed;
 
     public Mod(ModContext context)
@@ -72,9 +74,7 @@ public unsafe class Mod : ModBase
         _config = context.Configuration;
 
         if (!Utils.Initialise(context.Logger, _config, context.ModLoader))
-        {
             return;
-        }
 
         ScanNativeFunctions();
     }
@@ -85,158 +85,130 @@ public unsafe class Mod : ModBase
     {
         _config = configuration;
         Utils.UpdateConfig(configuration);
-        Utils.LogDebug("Configuration updated.");
+        Utils.Log("Configuration updated.");
     }
 
     private void ScanNativeFunctions()
     {
+        
         Utils.SigScan("Battle fatigue callback", "40 53 48 83 EC 20 48 8B D9 48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? 66 83 3B 00 75 ?? 48 8B 43 08 BA FF FF FF FF", address =>
-        {
-            _fatigueAddress = address;
-            PieceResolved();
-        });
+            {
+                _fatigueAddress = address;
 
-        Utils.SigScan("Adjust endurance caller", "E8 ?? ?? ?? ?? 0F B7 CB E8 ?? ?? ?? ?? 66 85 C0 75 ?? 0F B7 CB E8 ?? ?? ?? ??", address =>
-        {
-            _adjustEndurance = Marshal.GetDelegateForFunctionPointer<AdjustEndurance>(Utils.ResolveRelativeCall(address));
-            PieceResolved();
-        });
+                
 
-        Utils.SigScan("Get endurance caller", "E8 ?? ?? ?? ?? 66 85 C0 75 ?? 0F B7 CB E8 ?? ?? ?? ??", address =>
-        {
-            _getEndurance = Marshal.GetDelegateForFunctionPointer<GetEndurance>(Utils.ResolveRelativeCall(address));
-            PieceResolved();
-        });
+                _adjustEndurance = Marshal.GetDelegateForFunctionPointer<AdjustEndurance>(Utils.ResolveRelativeCall(address + 0x2B));
+                _getEndurance = Marshal.GetDelegateForFunctionPointer<GetEndurance>(Utils.ResolveRelativeCall(address + 0x33));
+                _getCondition = Marshal.GetDelegateForFunctionPointer<GetCondition>(Utils.ResolveRelativeCall(address + 0x40));
 
-        Utils.SigScan("Get battle condition caller", "E8 ?? ?? ?? ?? 8B 0D ?? ?? ?? ?? 41 0F 28 DE F3 44 0F 58 05 ?? ?? ?? ??", address =>
-        {
-            _getCondition = Marshal.GetDelegateForFunctionPointer<GetCondition>(Utils.ResolveRelativeCall(address));
-            PieceResolved();
-        });
+                PieceResolved();
+            });
 
-        Utils.SigScan("BitCheck caller", "E8 ?? ?? ?? ?? 85 C0 75 ?? 8D 50 01 B9 57 13 00 00 E8 ?? ?? ?? ?? B8 A8 00 00 00", address =>
-        {
-            _bitCheck = Marshal.GetDelegateForFunctionPointer<BitCheck>(Utils.ResolveRelativeCall(address));
-            PieceResolved();
-        });
+        
+        Utils.SigScan("Battle fatigue flag helper", "48 8B 75 48 33 FF 39 7E 10 0F 86 ?? ?? ?? ?? 48 89 5C 24 30", address =>
+            {
+                
+                _bitCheck = Marshal.GetDelegateForFunctionPointer<BitCheck>(Utils.ResolveRelativeCall(address + 0x37));
+                PieceResolved();
+            });
 
+        
         Utils.SigScan("Battle unit dead-state helper", "48 89 5C 24 08 57 48 83 EC 20 48 8B F9 48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? 66 83 3F 01", address =>
-        {
-            _allDeadAddress = address;
-            PieceResolved();
-        });
+            {
+                _allDeadAddress = address;
+                _isCharacterDead = Marshal.GetDelegateForFunctionPointer<IsCharacterDead>(Utils.ResolveRelativeCall(address + 0x44));
+                PieceResolved();
+            });
 
-        Utils.SigScan("Dead-state caller", "E8 ?? ?? ?? ?? 85 C0 75 ?? 48 8B 83 20 01 00 00 48 8D 93 A0 00 00 00", address =>
-        {
-            _isCharacterDead = Marshal.GetDelegateForFunctionPointer<IsCharacterDead>(Utils.ResolveRelativeCall(address));
-            PieceResolved();
-        });
-
+        
         Utils.SigScan("Set battle unit condition", "48 89 5C 24 08 57 48 83 EC 20 48 8B D9 0F B7 FA 48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? F6 03 04 75 0C 0F B7 4B 02 0F B7 D7 E8 ?? ?? ?? ?? 48 8B 5C 24 30", address =>
-        {
-            _setUnitConditionAddress = address;
-            _setUnitCondition = Marshal.GetDelegateForFunctionPointer<SetUnitCondition>(address);
-            PieceResolved();
-        });
+            {
+                _setUnitConditionAddress = address;
+                _setUnitCondition = Marshal.GetDelegateForFunctionPointer<SetUnitCondition>(address);
+                PieceResolved();
+            });
 
-        Utils.SigScan("Increment battle condition counter", "48 83 EC 28 48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? FF 05 ?? ?? ?? ?? 48 83 C4 28 C3", address =>
-        {
-            _counterIncrementAddress = address;
-            _incrementBattleCounter = Marshal.GetDelegateForFunctionPointer<IncrementBattleCounter>(address);
-            PieceResolved();
-        });
+        Utils.SigScan("Increment FES battle condition counter", "48 83 EC 28 48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? FF 05 ?? ?? ?? ?? 48 83 C4 28 C3", address =>
+            {
+                _counterIncrementAddress = address;
+                _incrementBattleCounter = Marshal.GetDelegateForFunctionPointer<IncrementBattleCounter>(address);
+                PieceResolved();
+            });
 
-        Utils.SigScan("Battle condition counter getter caller", "E8 ?? ?? ?? ?? 45 33 C0 48 8D 0D ?? ?? ?? ?? 90", address =>
-        {
-            _counterGetAddress = Utils.ResolveRelativeCall(address);
-            _getBattleCounter = Marshal.GetDelegateForFunctionPointer<GetBattleCounter>(_counterGetAddress);
-            PieceResolved();
-        });
+        Utils.SigScan("FES battle condition counter getter caller", "48 83 EC 28 48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 45 33 C0 48 8D 0D ?? ?? ?? ?? 90", address =>
+            {
+                _counterGetAddress = Utils.ResolveRelativeCall(address + 0x10);
+                _getBattleCounter = Marshal.GetDelegateForFunctionPointer<GetBattleCounter>(_counterGetAddress);
+                PieceResolved();
+            });
 
-        Utils.SigScan("RandInt caller", "E8 ?? ?? ?? ?? 8B BC 24 84 00 00 00 83 F8 32 73 ?? 66 2B DF", address =>
-        {
-            _randIntAddress = Utils.ResolveRelativeCall(address);
-            _randInt = Marshal.GetDelegateForFunctionPointer<RandInt>(_randIntAddress);
-            PieceResolved();
-        });
+        
+        
+        Utils.SigScan("RandInt caller", "40 53 48 83 EC 40 48 8B D9 48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 8B CB E8 ?? ?? ?? ?? 33 DB 41 BB C0 00 00 00", address =>
+            {
+                _randIntAddress = Utils.ResolveRelativeCall(address + 0x73);
+                _randInt = Marshal.GetDelegateForFunctionPointer<RandInt>(_randIntAddress);
+                PieceResolved();
+            });
 
-        Utils.SigScan("BitSet caller", "E8 ?? ?? ?? ?? 33 D2 B9 1A 13 00 00 E8 ?? ?? ?? ?? 33 D2 B9 1B 13 00 00", address =>
-        {
-            _bitSetThunkAddress = Utils.ResolveRelativeCall(address);
-            PieceResolved();
-        });
+        
+        Utils.SigScan("BitSet call site", "BA 01 00 00 00 B9 1D 14 00 00 E8 ?? ?? ?? ?? E8 ?? ?? ?? ??", address =>
+            {
+                _bitSetThunkAddress = Utils.ResolveRelativeCall(address + 0x0A);
+                PieceResolved();
+            });
 
-        Utils.SigScan("COMBAT_INFO global", "48 8B 05 ?? ?? ?? ?? 48 BA FF FF FF FF FF FF FF 3F", address =>
-        {
-            _combatInfoGlobalAddress = (nint)Utils.GetGlobalAddress((nuint)(address + 3));
-            PieceResolved();
-        });
+        
+        
+        Utils.SigScan("COMBAT_INFO result-state anchor", "40 53 48 83 EC 20 48 8B D9 48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 BA FF FF FF FF FF FF FF 3F", address =>
+            {
+                _combatInfoAnchorAddress = address;
 
-        Utils.SigScan("Victory presentation initializer", "48 8B C4 48 89 58 10 48 89 68 18 48 89 70 20 57 41 54 41 55 41 56 41 57 48 81 EC 90 00 00 00 0F 29 70 C8", address =>
-        {
-            _victoryPresentationAddress = address;
-            PieceResolved();
-        });
+                
+                _combatInfoGlobalAddress = (nint)Utils.GetGlobalAddress((nuint)(address + 0x18));
+                PieceResolved();
+            });
 
-        Utils.SigScan("Battle task enqueue caller", "E8 ?? ?? ?? ?? 48 83 BC 24 F8 00 00 00 00 0F 85 ?? ?? ?? ?? 66 41 83 BF", address =>
-        {
-            _enqueueBattleTask = Marshal.GetDelegateForFunctionPointer<TirednessPresentation.EnqueueBattleTask>(Utils.ResolveRelativeCall(address));
-            PieceResolved();
-        });
+        
+        Utils.SigScan("Victory presentation task family", "48 8B C4 48 89 58 10 48 89 68 18 48 89 70 20 57 41 54 41 55 41 56 41 57 48 81 EC 90 00 00 00 0F 29 70 C8", address =>
+            {
+                _victoryPresentationAddress = address;
 
-        Utils.SigScan("Battle motion task caller", "E8 ?? ?? ?? ?? 66 0F 6E 84 24 98 00 00 00 B2 01 0F 5B C0 48 8B C8", address =>
-        {
-            _createMotionTask = Marshal.GetDelegateForFunctionPointer<TirednessPresentation.CreateMotionTask>(Utils.ResolveRelativeCall(address));
-            PieceResolved();
-        });
+                _enqueueBattleTask = Marshal.GetDelegateForFunctionPointer<TirednessPresentation.EnqueueBattleTask>(Utils.ResolveRelativeCall(address + 0x1AA));
+                _createMotionTask = Marshal.GetDelegateForFunctionPointer<TirednessPresentation.CreateMotionTask>(Utils.ResolveRelativeCall(address + 0x1D5));
+                _createActorVoiceTask = Marshal.GetDelegateForFunctionPointer<TirednessPresentation.CreateActorVoiceTask>(Utils.ResolveRelativeCall(address + 0x3EF));
+                _createBattleStateTask = Marshal.GetDelegateForFunctionPointer<TirednessPresentation.CreateBattleStateTask>(Utils.ResolveRelativeCall(address + 0x4F4));
+                _createNavigatorTask = Marshal.GetDelegateForFunctionPointer<TirednessPresentation.CreateNavigatorTask>(Utils.ResolveRelativeCall(address + 0x52B));
+                PieceResolved();
+            });
 
-        Utils.SigScan("Battle actor voice task caller", "E8 ?? ?? ?? ?? B2 01 C6 00 05 49 8B 4E 58 48 89 48 08 48 8B C8 E8 ?? ?? ?? ?? 3B FE", address =>
-        {
-            _createActorVoiceTask = Marshal.GetDelegateForFunctionPointer<TirednessPresentation.CreateActorVoiceTask>(Utils.ResolveRelativeCall(address));
-            PieceResolved();
-        });
-
-        Utils.SigScan("Battle state task caller", "E8 ?? ?? ?? ?? 33 D2 48 8B C8 48 89 68 60 E8 ?? ?? ?? ?? 44 8B 84 24", address =>
-        {
-            _createBattleStateTask = Marshal.GetDelegateForFunctionPointer<TirednessPresentation.CreateBattleStateTask>(Utils.ResolveRelativeCall(address));
-            PieceResolved();
-        });
-
-        Utils.SigScan("Navigator task caller", "E8 ?? ?? ?? ?? 48 8B C8 B2 01 C6 00 04 48 8B 43 58 48 89 41 08 48 89 79 60 E8 ?? ?? ?? ??", address =>
-        {
-            _createNavigatorTask = Marshal.GetDelegateForFunctionPointer<TirednessPresentation.CreateNavigatorTask>(Utils.ResolveRelativeCall(address));
-            PieceResolved();
-        });
-
+        
         Utils.SigScan("Post-battle crossfade task", "40 53 48 83 EC 20 0F B7 D9 48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? BA 02 00 00 00 B9 08 03 00 00 E8 ?? ?? ?? ?? 48 8D 0D", address =>
-        {
-            _createCrossfadeTask = Marshal.GetDelegateForFunctionPointer<TirednessPresentation.CreateCrossfadeTask>(address);
-            PieceResolved();
-        });
+            {
+                _createCrossfadeTask = Marshal.GetDelegateForFunctionPointer<TirednessPresentation.CreateCrossfadeTask>(address);
+                PieceResolved();
+            });
 
-        Utils.SigScan("Battle sound task caller", "E8 ?? ?? ?? ?? B2 01 C6 00 05 48 8B 4F 58 48 89 48 08", address =>
-        {
-            _createSoundTask = Marshal.GetDelegateForFunctionPointer<TirednessPresentation.CreateSoundTask>(Utils.ResolveRelativeCall(address));
-            PieceResolved();
-        });
+        
+        Utils.SigScan("Battle sound task caller", "BA 02 00 00 00 8D 4A 08 44 8D 42 FF E8 ?? ?? ?? ?? B2 01 C6 00 05 48 8B 4F 58 48 89 48 08", address =>
+            {
+                _createSoundTask = Marshal.GetDelegateForFunctionPointer<TirednessPresentation.CreateSoundTask>(Utils.ResolveRelativeCall(address + 0x0C));
+                PieceResolved();
+            });
     }
 
     private void PieceResolved()
     {
         if (Interlocked.Increment(ref _resolvedPieces) == RequiredPieces)
-        {
             InstallHooks();
-        }
     }
 
     private void InstallHooks()
     {
         if (_installed)
-        {
             return;
-        }
 
-        if (_fatigueAddress == 0 || _allDeadAddress == 0 ||
+        if (_fatigueAddress == 0 || _combatInfoAnchorAddress == 0 || _allDeadAddress == 0 ||
             _setUnitConditionAddress == 0 || _counterIncrementAddress == 0 ||
             _counterGetAddress == 0 || _bitSetThunkAddress == 0 || _randIntAddress == 0 ||
             _combatInfoGlobalAddress == 0 || _adjustEndurance is null || _getEndurance is null ||
@@ -246,24 +218,35 @@ public unsafe class Mod : ModBase
             _createCrossfadeTask is null || _createMotionTask is null || _createSoundTask is null ||
             _createActorVoiceTask is null || _createNavigatorTask is null || _enqueueBattleTask is null)
         {
-            Utils.LogError("Native scans are incomplete, so hooks were not installed.");
+            Utils.LogError("Native function resolution was incomplete; hooks were not installed.");
             return;
         }
 
-        _presentation = new TirednessPresentation(_createBattleStateTask, _createCrossfadeTask, _createMotionTask, _createSoundTask, _createActorVoiceTask, _createNavigatorTask, _enqueueBattleTask);
+        _presentation = new TirednessPresentation(
+            _createBattleStateTask,
+            _createCrossfadeTask,
+            _createMotionTask,
+            _createSoundTask,
+            _createActorVoiceTask,
+            _createNavigatorTask,
+            _enqueueBattleTask);
 
         _fatigueHook = _hooks.CreateHook<FatigueCallback>(FatigueCallbackHook, _fatigueAddress).Activate();
         _fatigueOriginal = _fatigueHook.OriginalFunction;
 
+        
+        
         _victoryPresentationHook = _hooks.CreateHook<VictoryPresentationInit>(VictoryPresentationInitHook, _victoryPresentationAddress).Activate();
         _victoryPresentationOriginal = _victoryPresentationHook.OriginalFunction;
 
+        
         nint bitSetTarget = Utils.ResolveRelativeJump(_bitSetThunkAddress);
         _bitSetHook = _hooks.CreateHook<BitSet>(BitSetHook, bitSetTarget).Activate();
         _bitSetOriginal = _bitSetHook.OriginalFunction;
 
         _installed = true;
-        Utils.Log("FES tiredness system initialised.");
+        Utils.Log("FES tiredness restoration hooks installed. Live post-victory restoration uses the confirmed result initializer.");
+        Debug($"Live post-victory initializer: P3P.exe+0x{(_victoryPresentationAddress - Utils.BaseAddress):X}.");
     }
 
     private ushort FatigueCallbackHook(nint unit)
@@ -283,21 +266,19 @@ public unsafe class Mod : ModBase
                 validPartyUnit = IsFatigueMember(memberId);
 
                 if (validPartyUnit)
-                {
                     enduranceBefore = _getEndurance!(memberId);
-                }
             }
         }
 
         ushort result = _fatigueOriginal!(unit);
 
         if (!validPartyUnit)
-        {
             return result;
-        }
 
         ushort enduranceAfterNative = _getEndurance!(memberId);
 
+        
+        
         int drainMultiplier = GetFatigueDrainMultiplier();
         if (drainMultiplier > 1 && enduranceAfterNative < enduranceBefore)
         {
@@ -306,13 +287,14 @@ public unsafe class Mod : ModBase
 
         ushort enduranceAfter = _getEndurance!(memberId);
         ushort condition = _getCondition!(memberId);
-        Debug($"Fatigue: member={memberId}, endurance={enduranceBefore}->{enduranceAfter}, condition={condition}, x{drainMultiplier}.");
+        Debug($"[ResultTrace] fatigue callback member={memberId}, return={result}, endurance={enduranceBefore}->{enduranceAfter}, condition={condition}, multiplier=x{drainMultiplier}.");
 
+        
         if (condition <= 2 && enduranceAfter == 0)
         {
             _setUnitCondition!(characterInfo, Tired);
             ArmEntranceDeparture(memberId, Tired);
-            Debug($"Member {memberId} became Tired at zero endurance.");
+            Debug($"50% fatigue path: member {memberId} reached 0 endurance -> Tired.");
             return Tired;
         }
 
@@ -322,6 +304,8 @@ public unsafe class Mod : ModBase
     private void VictoryPresentationInitHook(nint stateData)
     {
 
+        
+
         nint combatInfo = GetCombatInfo();
         ulong taskBoundaryBeforeResult = TirednessPresentation.GetMaxQueuedTaskId(combatInfo);
 
@@ -330,55 +314,61 @@ public unsafe class Mod : ModBase
         ushort changedMemberId = 0;
         ushort changedCondition = 0;
 
-        bool changed = TryRunRestoredFesPostVictoryPass(out changedModel, out changedMemberId, out changedCondition);
+        bool changed = TryRunRestoredFesPostVictoryPass(
+            out changedModel,
+            out changedMemberId,
+            out changedCondition);
 
         if (changed)
-        {
             changedActor = FindBattleActor(changedModel);
-        }
 
+        
+
+        
         _victoryPresentationOriginal!(stateData);
         ulong nativeResultTaskMax = TirednessPresentation.GetMaxQueuedTaskId(combatInfo);
 
         if (!changed)
-        {
             return;
-        }
 
         if (changedActor == null)
         {
-            Utils.LogError($"Battle actor {changedMemberId} was not found, so the result scene was skipped.");
+            Utils.LogError($"Unable to find battle actor for member {changedMemberId}; condition changed but the FES presentation was skipped.");
             return;
         }
 
-        ulong cameraTaskId = TirednessPresentation.RetargetResultCameraInRange(combatInfo, taskBoundaryBeforeResult, nativeResultTaskMax, changedModel);
-
-        if (cameraTaskId == 0)
+        if (!_presentation!.TryStart(
+                changedActor,
+                changedModel,
+                changedCondition,
+                out TirednessPresentation.PresentationHandle presentation))
         {
-            Utils.LogDebug($"The result camera did not move to member {changedMemberId}.");
-        }
-        else
-        {
-            Debug($"Result camera retargeted: task={cameraTaskId}, member={changedMemberId}.");
-        }
-
-        if (!_presentation!.TryStart(changedActor, changedModel, changedCondition, out TirednessPresentation.PresentationHandle presentation))
-        {
-            Utils.LogError($"Tiredness presentation failed for member {changedMemberId}.");
+            Utils.LogError($"Unable to start the FES post-battle presentation for member {changedMemberId}.");
             return;
         }
 
-        int gated = _presentation.GateTasksInRange(combatInfo, taskBoundaryBeforeResult, nativeResultTaskMax, presentation.CompletionTaskId, cameraTaskId, out int ungated);
+        int gated = _presentation.GateTasksInRange(
+            combatInfo,
+            taskBoundaryBeforeResult,
+            nativeResultTaskMax,
+            presentation.CompletionTaskId,
+            out int ungated);
 
-        Debug($"Tiredness presentation started: member={changedMemberId}, condition={changedCondition}, gated={gated}, ungated={ungated}.");
+        Debug($"Started FES after-battle presentation for member {changedMemberId}, condition {changedCondition}; " +
+              $"result focus held by native task dependencies (gated={gated}, ungated={ungated}, completionTask={presentation.CompletionTaskId}).");
 
         if (ungated != 0)
         {
-            Utils.LogDebug($"Could not gate {ungated} result task(s); order unchanged.");
+            Utils.LogError($"{ungated} native result task(s) had both dependency slots occupied; presentation ordering may be incomplete.");
         }
     }
 
-    private bool TryRunRestoredFesPostVictoryPass(out CombatModel* changedModel, out ushort changedMemberId, out ushort changedCondition)
+    
+
+    private bool TryRunRestoredFesPostVictoryPass(
+        out CombatModel* changedModel,
+        out ushort changedMemberId,
+        out ushort changedCondition)
     {
         changedModel = null;
         changedMemberId = 0;
@@ -386,27 +376,28 @@ public unsafe class Mod : ModBase
 
         nint combatInfo = GetCombatInfo();
         if (combatInfo == 0)
-        {
             return false;
-        }
 
+        
         _incrementBattleCounter!();
 
         if (_bitCheck!(SpecialOperationFlag) != 0)
         {
-            Debug("Post-victory pass skipped; flag 0x172 is set.");
+            Debug("Skipped restored FES post-victory pass because flag 0x172 is set.");
             return false;
         }
 
         int livingSickMembers = 0;
 
+        
+        
         int guard = 0;
-        for (CombatModel* model = *(CombatModel**)(combatInfo + 0x1C0); model != null && guard++ < 64; model = model->Next)
+        for (CombatModel* model = *(CombatModel**)(combatInfo + 0x1C0);
+             model != null && guard++ < 64;
+             model = model->Next)
         {
             if (!TryGetPartyCharacter(model, out nint characterInfo, out ushort memberId))
-            {
                 continue;
-            }
 
             ushort condition = _getCondition!(memberId);
 
@@ -416,10 +407,11 @@ public unsafe class Mod : ModBase
                 int drainMultiplier = GetFatigueDrainMultiplier();
                 _adjustEndurance!(memberId, checked((short)-drainMultiplier));
                 ushort after = _getEndurance!(memberId);
-                Debug($"Endurance: member={memberId}, {before}->{after}, x{drainMultiplier}.");
+                Debug($"FES post-victory pass: member {memberId} endurance {before} -> {after} (x{drainMultiplier}).");
             }
 
-            if (condition == Sick && _isCharacterDead!(characterInfo, 0) == 0)
+            if (condition == Sick &&
+                _isCharacterDead!(characterInfo, 0) == 0)
             {
                 livingSickMembers++;
             }
@@ -429,25 +421,26 @@ public unsafe class Mod : ModBase
         if (livingSickMembers > 0 && NextRandom(100) < 10)
         {
 
+            
             _ = NextRandom((uint)livingSickMembers);
             contagionEvent = true;
         }
+
+        
 
         bool anyChanged = false;
         int changedCount = 0;
 
         guard = 0;
-        for (CombatModel* model = *(CombatModel**)(combatInfo + 0x1C0); model != null && guard++ < 64; model = model->Next)
+        for (CombatModel* model = *(CombatModel**)(combatInfo + 0x1C0);
+             model != null && guard++ < 64;
+             model = model->Next)
         {
             if (!TryGetPartyCharacter(model, out nint characterInfo, out ushort memberId))
-            {
                 continue;
-            }
 
             if (_isCharacterDead!(characterInfo, 0) != 0)
-            {
                 continue;
-            }
 
             ushort oldCondition = _getCondition!(memberId);
             ushort newCondition = oldCondition;
@@ -464,6 +457,8 @@ public unsafe class Mod : ModBase
                         zeroEnduranceTransition = true;
                     }
 
+                    
+                    
                     if (!zeroEnduranceTransition && contagionEvent)
                     {
                         int sickChance = oldCondition switch
@@ -482,7 +477,9 @@ public unsafe class Mod : ModBase
                     break;
 
                 case Tired:
-                    if (contagionEvent && NextRandom(100) < 60 && memberId != 3)
+                    if (contagionEvent &&
+                        NextRandom(100) < 60 &&
+                        memberId != 3)
                     {
                         newCondition = Sick;
                     }
@@ -501,9 +498,7 @@ public unsafe class Mod : ModBase
             }
 
             if (newCondition == oldCondition)
-            {
                 continue;
-            }
 
             _setUnitCondition!(characterInfo, newCondition);
             ArmEntranceDeparture(memberId, newCondition);
@@ -517,12 +512,12 @@ public unsafe class Mod : ModBase
                 changedCondition = newCondition;
             }
 
-            Debug($"Condition: member={memberId}, {oldCondition}->{newCondition}.");
+            Debug($"FES post-victory pass: member {memberId} condition {oldCondition} -> {newCondition}.");
         }
 
         if (changedCount > 1)
         {
-            Debug($"Conditions changed: count={changedCount}, presentation member={changedMemberId}.");
+            Debug($"FES post-victory pass: {changedCount} party members changed condition; member {changedMemberId} owns the single after-battle presentation.");
         }
 
         return anyChanged;
@@ -530,13 +525,30 @@ public unsafe class Mod : ModBase
 
     private void ArmEntranceDeparture(ushort memberId, ushort condition)
     {
-        if (_bitSetOriginal is null || condition < Tired || !IsDepartureMember(memberId))
-        {
+        if (_bitSetOriginal is null || condition < Tired || !TryGetDepartureIndex(memberId, out int departureIndex))
             return;
+
+        uint presenceFlag = FirstPresenceFlag + (uint)departureIndex;
+        uint availabilityFlag = FirstAvailabilityFlag + (uint)departureIndex;
+        _bitSetOriginal(presenceFlag, 0);
+        _bitSetOriginal(availabilityFlag, 0);
+        _bitSetOriginal(MemberReturnTriggerFlag, 1);
+        Debug($"Entrance departure armed: member {memberId}, condition {condition}, presence {presenceFlag} OFF, availability {availabilityFlag} OFF, flag {MemberReturnTriggerFlag} ON.");
+    }
+
+    private static bool TryGetDepartureIndex(ushort memberId, out int departureIndex)
+    {
+        for (int i = 0; i < DepartureMembers.Length; i++)
+        {
+            if (DepartureMembers[i] == memberId)
+            {
+                departureIndex = i;
+                return true;
+            }
         }
 
-        _bitSetOriginal(MemberReturnTriggerFlag, 1);
-        Debug($"Departure armed: member={memberId}, condition={condition}, flag={MemberReturnTriggerFlag}.");
+        departureIndex = -1;
+        return false;
     }
 
     private static bool IsFatigueMember(ushort memberId)
@@ -554,17 +566,15 @@ public unsafe class Mod : ModBase
     {
         nint combatInfo = GetCombatInfo();
         if (combatInfo == 0 || model == null)
-        {
             return null;
-        }
 
         int guard = 0;
-        for (BattleActor* actor = *(BattleActor**)(combatInfo + 0x1B0); actor != null && guard++ < 64; actor = actor->Next)
+        for (BattleActor* actor = *(BattleActor**)(combatInfo + 0x1B0);
+             actor != null && guard++ < 64;
+             actor = actor->Next)
         {
             if (actor->Model == model)
-            {
                 return actor;
-            }
         }
 
         return null;
@@ -573,9 +583,7 @@ public unsafe class Mod : ModBase
     private nint GetCombatInfo()
     {
         if (_combatInfoGlobalAddress == 0)
-        {
             return 0;
-        }
 
         return *(nint*)_combatInfoGlobalAddress;
     }
@@ -584,7 +592,9 @@ public unsafe class Mod : ModBase
     {
         _bitSetOriginal!(flag, state);
 
-        if (state != 0 || flag < FirstPresenceFlag || flag > LastPresenceFlag)
+        if (state != 0 ||
+            flag < FirstPresenceFlag ||
+            flag > LastPresenceFlag)
         {
             return;
         }
@@ -593,11 +603,12 @@ public unsafe class Mod : ModBase
         ushort memberId = DepartureMembers[departureIndex];
         ushort condition = _getCondition!(memberId);
 
+        
         if (condition >= Tired)
         {
             uint availabilityFlag = FirstAvailabilityFlag + (uint)departureIndex;
             _bitSetOriginal(availabilityFlag, 0);
-            Debug($"Departure synced: member={memberId}, presence={flag}, availability={availabilityFlag}.");
+            Debug($"Departure sync: member {memberId}, presence {flag} OFF, availability {availabilityFlag} OFF.");
         }
     }
 
@@ -607,13 +618,13 @@ public unsafe class Mod : ModBase
         memberId = 0;
 
         if (model == null || model->MemberInfo == null)
-        {
             return false;
-        }
 
         characterInfo = (nint)model->MemberInfo;
         memberId = model->MemberInfo->MemberId;
 
+        
+        
         return IsFatigueMember(memberId);
     }
 
@@ -623,9 +634,7 @@ public unsafe class Mod : ModBase
         int clamped = Math.Clamp(configured, 1, MaxFatigueDrainMultiplier);
 
         if (configured != clamped)
-        {
-            Debug($"Fatigue multiplier {configured} is invalid; using {clamped}.");
-        }
+            Debug($"Fatigue Drain Multiplier {configured} is outside the supported range; using {clamped}.");
 
         return clamped;
     }
@@ -633,9 +642,7 @@ public unsafe class Mod : ModBase
     private uint NextRandom(uint max)
     {
         if (max == 0)
-        {
             return 0;
-        }
 
         return _randInt!(max);
     }
